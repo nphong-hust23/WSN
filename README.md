@@ -54,7 +54,7 @@ uint32_t LoRa_Platform_GetTickMs(void) {
 Instantiate a `LoRa_Config_t` configuration structure to establish your RF operating parameters, call the core driver initialization routine, and switch the module into automated listening mode.
 
 ```c
-#include "LoRa_gemini2.h"
+#include "LoRa.h"
 
 // 1. Declare the global configuration structure
 LoRa_Config_t lora_device = {
