@@ -1,5 +1,5 @@
-#ifndef LORA_GEMINI2_H
-#define LORA_GEMINI2_H
+#ifndef LORA_H
+#define LORA_H
 
 #include <stdint.h>
 
