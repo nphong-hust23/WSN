@@ -1,4 +1,4 @@
-```markdown
+Markdown
 # SX1276 LoRa Driver User Guide (Interrupt, LBT & Network Application Example)
 
 This documentation provides a comprehensive guide on how to integrate and deploy this hardware-agnostic Semtech SX1276 LoRa driver into your embedded project (compatible with STM32, ESP32, Arduino, AVR, or any other MCU platform).
