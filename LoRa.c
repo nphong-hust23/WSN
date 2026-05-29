@@ -145,7 +145,7 @@ void LoRa_RegisterRxCallback(LoRa_Config_t* _LoRa, LoRa_RxCallback_t callback) {
 
 /**
  * @brief Interrupt service routine handler for the LoRa DIO0 pin.
- * @param _LoRa Pointer to the LoRa configuration structure.
+ * @param _LoRa Pointer to the LoRa configuration structure containing RF parameters.
  */
 void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
     if (_LoRa == NULL) return;
@@ -154,19 +154,16 @@ void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
     LoRa_WriteReg(REG_IRQ_FLAGS, irq);
 
     if (irq & 0x08) {
-        mPrint("TxDone");
         g_lora_tx_done = 1;
         return;
     }
 
     if (irq & 0x20) {
-        mPrint("PayLoadCrcErrorDone");
         g_lora_stats.rx_crc_err++;
         return;
     }
 
     if (irq & 0x40) {
-        mPrint("RxDone");
         s_rx_fifo_addr = LoRa_ReadReg(REG_FIFO_RX_CURRENT);
         g_lora_rx_done = 1;
 
