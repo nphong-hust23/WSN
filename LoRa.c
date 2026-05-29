@@ -257,14 +257,14 @@ LoRa_CAD_Status_t LoRa_DoCAD(LoRa_Config_t* _LoRa, uint32_t timeout_ms) {
 
 /**
  * @brief Transmits a data packet over the air using polling mechanism for completion.
- * @param _LoRa Pointer to the LoRa configuration structure.
- * @param buf Pointer to the buffer containing the raw data to transmit.
- * @param len Length of the data in bytes.
- * @param timeout Maximum time in milliseconds to wait for the transmission to complete.
- * @return LORA_OK on successful transmission, LORA_TIMEOUT if it exceeded the limit, or LORA_ERROR.
+ * @param _LoRa Pointer to the LoRa configuration structure containing RF parameters.
+ * @param buf Pointer to the buffer containing the raw data bytes to transmit.
+ * @param len Length of the data payload in bytes.
+ * @param timeout Maximum time allowed in milliseconds to wait for transmission to finish.
+ * @return LoRa_Status_t LORA_OK on success, LORA_TIMEOUT if expiration occurs, or LORA_ERROR.
  */
 LoRa_Status_t LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
-                              uint8_t len, uint32_t timeout) {
+                            uint8_t len, uint32_t timeout) {
     if (!buf || !len || _LoRa == NULL) return LORA_ERROR;
 
     LoRa_SetMode(_LoRa, STNBY_MODE);
@@ -282,15 +282,14 @@ LoRa_Status_t LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
     if (!timeout) return LORA_OK;
 
     uint32_t t0 = LoRa_Platform_GetTickMs();
-    while (!(LoRa_ReadReg(REG_IRQ_FLAGS) & 0x08)) {
+    while (g_lora_tx_done == 0) {
         if ((LoRa_Platform_GetTickMs() - t0) > timeout) {
             LoRa_SetMode(_LoRa, STNBY_MODE);
             g_lora_stats.tx_fail++;
             return LORA_TIMEOUT;
         }
     }
-    LoRa_WriteReg(REG_IRQ_FLAGS, 0x08);
-    g_lora_tx_done = 1;
+
     LoRa_SetMode(_LoRa, STNBY_MODE);
     g_lora_stats.tx_ok++;
     return LORA_OK;
