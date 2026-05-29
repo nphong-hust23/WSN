@@ -68,9 +68,10 @@ typedef enum {
 } LoRa_Status_t;
 
 typedef enum {
-    LORA_CAD_FREE       = 0,
-    LORA_CAD_BUSY       = 1,
-    LORA_CAD_TIMEOUT    = 2
+    LORA_CAD_FREE            = 0,
+    LORA_CAD_BUSY            = 1,
+    LORA_CAD_TIMEOUT         = 2,
+    LORA_CAD_INVALID_PARAM   = 3
 } LoRa_CAD_Status_t;
 
 typedef void (*LoRa_RxCallback_t)(uint8_t packet_len);
