@@ -112,9 +112,8 @@ void              LoRa_Reset(void);
 void              LoRa_SetMode(LoRa_Config_t* _LoRa, int mode);
 void              LoRa_RxStart(LoRa_Config_t* _LoRa);
 
-LoRa_Status_t     LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
-                                       uint8_t max_len, uint8_t* out_len,
-                                       uint16_t* out_seq);
+LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
+                                  uint8_t max_len, uint8_t* out_len)
 
 LoRa_Status_t     LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
                                   uint8_t len, uint32_t timeout);
