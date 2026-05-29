@@ -234,7 +234,7 @@ void LoRa_RxStart(LoRa_Config_t* _LoRa) {
  * @return LORA_CAD_FREE if the channel is clear, LORA_CAD_BUSY if a preamble is detected, or LORA_CAD_TIMEOUT.
  */
 LoRa_CAD_Status_t LoRa_DoCAD(LoRa_Config_t* _LoRa, uint32_t timeout_ms) {
-    if (_LoRa == NULL) return LORA_CAD_TIMEOUT;
+    if (_LoRa == NULL) return LORA_CAD_INVALID_PARAM;
 
     LoRa_WriteReg(REG_IRQ_FLAGS, 0xFF);
     LoRa_WriteReg(REG_DIO_MAPPING1, 0x80);
