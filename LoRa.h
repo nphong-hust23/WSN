@@ -1,5 +1,5 @@
-#ifndef LORA_GEMINI2_H
-#define LORA_GEMINI2_H
+#ifndef LORA_H
+#define LORA_H
 
 #include <stdint.h>
 
@@ -68,9 +68,10 @@ typedef enum {
 } LoRa_Status_t;
 
 typedef enum {
-    LORA_CAD_FREE       = 0,
-    LORA_CAD_BUSY       = 1,
-    LORA_CAD_TIMEOUT    = 2
+    LORA_CAD_FREE            = 0,
+    LORA_CAD_BUSY            = 1,
+    LORA_CAD_TIMEOUT         = 2,
+    LORA_CAD_INVALID_PARAM   = 3
 } LoRa_CAD_Status_t;
 
 typedef void (*LoRa_RxCallback_t)(uint8_t packet_len);
@@ -112,9 +113,8 @@ void              LoRa_Reset(void);
 void              LoRa_SetMode(LoRa_Config_t* _LoRa, int mode);
 void              LoRa_RxStart(LoRa_Config_t* _LoRa);
 
-LoRa_Status_t     LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
-                                       uint8_t max_len, uint8_t* out_len,
-                                       uint16_t* out_seq);
+LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
+                                  uint8_t max_len, uint8_t* out_len)
 
 LoRa_Status_t     LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
                                   uint8_t len, uint32_t timeout);
