@@ -74,7 +74,6 @@ typedef enum {
     LORA_CAD_INVALID_PARAM   = 3
 } LoRa_CAD_Status_t;
 
-typedef void (*LoRa_RxCallback_t)(uint8_t packet_len);
 
 typedef struct {
     uint32_t          frequency;
@@ -89,7 +88,6 @@ typedef struct {
     uint8_t           current_mode;
     uint8_t           enableCRC;
     uint8_t           implicitHeader;
-    LoRa_RxCallback_t on_receive;
 } LoRa_Config_t;
 
 typedef struct {
@@ -107,14 +105,13 @@ extern volatile uint8_t g_lora_rx_done;
 extern LoRa_Stats_t     g_lora_stats;
 
 LoRa_Status_t     LoRa_Init(LoRa_Config_t* _LoRa);
-void              LoRa_RegisterRxCallback(LoRa_Config_t* _LoRa, LoRa_RxCallback_t callback);
 void              LoRa_IRQHandler(LoRa_Config_t* _LoRa);
 void              LoRa_Reset(void);
 void              LoRa_SetMode(LoRa_Config_t* _LoRa, int mode);
 void              LoRa_RxStart(LoRa_Config_t* _LoRa);
 
 LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
-                                  uint8_t max_len, uint8_t* out_len)
+                                  uint8_t max_len);
 
 LoRa_Status_t     LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
                                   uint8_t len, uint32_t timeout);

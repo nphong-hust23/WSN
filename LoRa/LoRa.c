@@ -7,6 +7,7 @@ LoRa_Stats_t     g_lora_stats    = {0};
 static uint16_t  s_tx_seq        = 0;
 
 static volatile uint8_t s_rx_fifo_addr = 0;
+static volatile uint8_t s_rx_pkt_len   = 0;
 
 /**
  * @brief Reads a value from a specific LoRa register via SPI.
@@ -128,20 +129,10 @@ LoRa_Status_t LoRa_Init(LoRa_Config_t* _LoRa) {
     LoRa_SetAutoLDO(_LoRa);
     LoRa_SetMode(_LoRa, STNBY_MODE);
 
-    _LoRa->on_receive = NULL;
     s_rx_fifo_addr    = 0;
     return LORA_OK;
 }
 
-/**
- * @brief Registers a user callback function to be executed when a valid packet is received.
- * @param _LoRa Pointer to the LoRa configuration structure.
- * @param callback Function pointer to the RX callback function.
- */
-void LoRa_RegisterRxCallback(LoRa_Config_t* _LoRa, LoRa_RxCallback_t callback) {
-    if (_LoRa == NULL) return;
-    _LoRa->on_receive = callback;
-}
 
 /**
  * @brief Interrupt service routine handler for the LoRa DIO0 pin.
@@ -165,12 +156,8 @@ void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
 
     if (irq & 0x40) {
         s_rx_fifo_addr = LoRa_ReadReg(REG_FIFO_RX_CURRENT);
+        s_rx_pkt_len   = LoRa_ReadReg(REG_RX_NB_BYTES);
         g_lora_rx_done = 1;
-
-        if (_LoRa->on_receive != NULL) {
-            uint8_t pkt_len = LoRa_ReadReg(REG_RX_NB_BYTES);
-            _LoRa->on_receive(pkt_len);
-        }
     }
 }
 
@@ -179,35 +166,26 @@ void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
  * * @param _LoRa    Pointer to the LoRa configuration structure.
  * @param buf      Pointer to the buffer where received data will be stored.
  * @param max_len  Maximum capacity of the destination buffer to prevent overflow.
- * @param out_len  Pointer to store the actual length of the received payload.
  * @return LoRa_Status_t LORA_OK on success, or error status code on failure.
  */
-LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf,
-                                   uint8_t max_len, uint8_t* out_len) {
-    if (_LoRa == NULL || buf == NULL || out_len == NULL) return LORA_INVALID_PARAM;
-
-    *out_len = 0;
+LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf, uint8_t max_len) {
+    if (_LoRa == NULL || buf == NULL) return LORA_INVALID_PARAM;
 
     if (g_lora_rx_done == 0) return LORA_OK;
     g_lora_rx_done = 0;
 
     LoRa_WriteReg(REG_FIFO_ADDR_PTR, s_rx_fifo_addr);
 
-    uint8_t pkt_len = LoRa_ReadReg(REG_RX_NB_BYTES);
+    uint8_t pkt_len = s_rx_pkt_len;
     if (pkt_len == 0) {
         LoRa_RxStart(_LoRa);
         return LORA_ERROR;
     }
 
-    uint8_t payload_len = pkt_len;
-    if (payload_len > max_len) {
-        payload_len = max_len;
-        g_lora_stats.rx_overflow++;
-    }
+    uint8_t payload_len = (pkt_len > max_len) ? max_len : pkt_len;
+    if (pkt_len > max_len) g_lora_stats.rx_overflow++;
 
     LoRa_BurstRead(REG_FIFO, buf, payload_len);
-    *out_len = payload_len;
-
     g_lora_stats.rx_ok++;
 
     LoRa_RxStart(_LoRa);
