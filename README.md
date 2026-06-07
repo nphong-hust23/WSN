@@ -30,7 +30,7 @@ The project consists of 4 core files:
 
 Before compiling, you must implement the following hardware-specific platform functions inside your board support package (typically mapped to STM32 HAL SPI & GPIO):
 
-
+```c
 void     LoRa_Platform_SPI_Init(void);
 uint8_t  LoRa_Platform_SPI_Transfer(uint8_t val);
 void     LoRa_Platform_NSS_Low(void);
@@ -40,7 +40,7 @@ void     LoRa_Platform_RESET_High(void);
 void     LoRa_Platform_DelayMs(uint32_t ms);
 uint32_t LoRa_Platform_GetTickMs(void);
 
-
+```
 
 ---
 
