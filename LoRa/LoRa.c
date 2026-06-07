@@ -4,7 +4,6 @@
 volatile uint8_t g_lora_tx_done  = 0;
 volatile uint8_t g_lora_rx_done  = 0;
 LoRa_Stats_t     g_lora_stats    = {0};
-static uint16_t  s_tx_seq        = 0;
 
 static volatile uint8_t s_rx_fifo_addr = 0;
 static volatile uint8_t s_rx_pkt_len   = 0;
@@ -14,7 +13,7 @@ static volatile uint8_t s_rx_pkt_len   = 0;
  * @param addr The register address to read from.
  * @return The 8-bit value read from the register.
  */
-static uint8_t LoRa_ReadReg(uint8_t addr) {
+uint8_t LoRa_ReadReg(uint8_t addr) {
     uint8_t val;
     LoRa_Platform_NSS_Low();
     LoRa_Platform_SPI_Transfer(addr & 0x7F);
@@ -28,7 +27,7 @@ static uint8_t LoRa_ReadReg(uint8_t addr) {
  * @param addr The register address to write to.
  * @param value The 8-bit value to be written.
  */
-static void LoRa_WriteReg(uint8_t addr, uint8_t value) {
+void LoRa_WriteReg(uint8_t addr, uint8_t value) {
     LoRa_Platform_NSS_Low();
     LoRa_Platform_SPI_Transfer(addr | 0x80);
     LoRa_Platform_SPI_Transfer(value);
@@ -41,7 +40,7 @@ static void LoRa_WriteReg(uint8_t addr, uint8_t value) {
  * @param buf Pointer to the destination buffer.
  * @param len Number of bytes to read.
  */
-static void LoRa_BurstRead(uint8_t addr, uint8_t* buf, uint8_t len) {
+void LoRa_BurstRead(uint8_t addr, uint8_t* buf, uint8_t len) {
     LoRa_Platform_NSS_Low();
     LoRa_Platform_SPI_Transfer(addr & 0x7F);
     for (uint8_t i = 0; i < len; i++) {
@@ -56,7 +55,7 @@ static void LoRa_BurstRead(uint8_t addr, uint8_t* buf, uint8_t len) {
  * @param buf Pointer to the source data buffer.
  * @param len Number of bytes to write.
  */
-static void LoRa_BurstWrite(uint8_t addr, const uint8_t* buf, uint8_t len) {
+void LoRa_BurstWrite(uint8_t addr, const uint8_t* buf, uint8_t len) {
     LoRa_Platform_NSS_Low();
     LoRa_Platform_SPI_Transfer(addr | 0x80);
     for (uint8_t i = 0; i < len; i++) {
@@ -115,7 +114,6 @@ LoRa_Status_t LoRa_Init(LoRa_Config_t* _LoRa) {
     if (LoRa_SetPower(_LoRa, _LoRa->power)               != LORA_OK) return LORA_ERROR;
     if (LoRa_SetOCP(_LoRa, _LoRa->overCurrentProtection) != LORA_OK) return LORA_ERROR;
 
-    /* FIX: Added proper status checks for modulation parameters instead of discarding return values */
     if (LoRa_SetSpreadingFactor(_LoRa, _LoRa->spredingFactor) != LORA_OK) return LORA_ERROR;
     if (LoRa_SetBandwidth(_LoRa, _LoRa->bandWidth)           != LORA_OK) return LORA_ERROR;
     if (LoRa_SetCodingRate(_LoRa, _LoRa->crcRate)             != LORA_OK) return LORA_ERROR;
@@ -133,37 +131,9 @@ LoRa_Status_t LoRa_Init(LoRa_Config_t* _LoRa) {
     return LORA_OK;
 }
 
-
-/**
- * @brief Interrupt service routine handler for the LoRa DIO0 pin.
- * @param _LoRa Pointer to the LoRa configuration structure containing RF parameters.
- */
-void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
-    if (_LoRa == NULL) return;
-
-    uint8_t irq = LoRa_ReadReg(REG_IRQ_FLAGS);
-    LoRa_WriteReg(REG_IRQ_FLAGS, irq);
-
-    if (irq & 0x08) {
-        g_lora_tx_done = 1;
-        return;
-    }
-
-    if (irq & 0x20) {
-        g_lora_stats.rx_crc_err++;
-        return;
-    }
-
-    if (irq & 0x40) {
-        s_rx_fifo_addr = LoRa_ReadReg(REG_FIFO_RX_CURRENT);
-        s_rx_pkt_len   = LoRa_ReadReg(REG_RX_NB_BYTES);
-        g_lora_rx_done = 1;
-    }
-}
-
 /**
  * @brief Reads the received packet data from the LoRa FIFO buffer.
- * * @param _LoRa    Pointer to the LoRa configuration structure.
+ * @param _LoRa    Pointer to the LoRa configuration structure.
  * @param buf      Pointer to the buffer where received data will be stored.
  * @param max_len  Maximum capacity of the destination buffer to prevent overflow.
  * @return LoRa_Status_t LORA_OK on success, or error status code on failure.
@@ -171,26 +141,13 @@ void LoRa_IRQHandler(LoRa_Config_t* _LoRa) {
 LoRa_Status_t LoRa_ReadPacketData(LoRa_Config_t* _LoRa, uint8_t* buf, uint8_t max_len) {
     if (_LoRa == NULL || buf == NULL) return LORA_INVALID_PARAM;
 
-    if (g_lora_rx_done == 0) return LORA_OK;
+    if (g_lora_rx_done == 0) return LORA_ERROR;
     g_lora_rx_done = 0;
 
-    LoRa_WriteReg(REG_FIFO_ADDR_PTR, s_rx_fifo_addr);
-
-    uint8_t pkt_len = s_rx_pkt_len;
-    if (pkt_len == 0) {
-        LoRa_RxStart(_LoRa);
-        return LORA_ERROR;
-    }
-
-    uint8_t payload_len = (pkt_len > max_len) ? max_len : pkt_len;
-    if (pkt_len > max_len) g_lora_stats.rx_overflow++;
-
-    LoRa_BurstRead(REG_FIFO, buf, payload_len);
     g_lora_stats.rx_ok++;
-
-    LoRa_RxStart(_LoRa);
     return LORA_OK;
 }
+
 /**
  * @brief Configures the module and switches it to continuous reception mode.
  * @param _LoRa Pointer to the LoRa configuration structure.
@@ -201,7 +158,6 @@ void LoRa_RxStart(LoRa_Config_t* _LoRa) {
     LoRa_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
     LoRa_WriteReg(REG_IRQ_FLAGS, 0xFF);
     g_lora_rx_done  = 0;
-    s_rx_fifo_addr  = 0;
     LoRa_SetMode(_LoRa, RXCONTIN_MODE);
 }
 
@@ -241,26 +197,31 @@ LoRa_CAD_Status_t LoRa_DoCAD(LoRa_Config_t* _LoRa, uint32_t timeout_ms) {
  * @param timeout Maximum time allowed in milliseconds to wait for transmission to finish.
  * @return LoRa_Status_t LORA_OK on success, LORA_TIMEOUT if expiration occurs, or LORA_ERROR.
  */
-LoRa_Status_t LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
-                            uint8_t len, uint32_t timeout) {
+LoRa_Status_t LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf, uint8_t len, uint32_t timeout) {
     if (!buf || !len || _LoRa == NULL) return LORA_ERROR;
 
     LoRa_SetMode(_LoRa, STNBY_MODE);
-    LoRa_Platform_DelayMs(1);
+    LoRa_Platform_DelayMs(2);
 
-    LoRa_WriteReg(REG_DIO_MAPPING1, 0x40);
     LoRa_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
     LoRa_BurstWrite(REG_FIFO, buf, len);
     LoRa_WriteReg(REG_PAYLOAD_LENGTH, len);
+
     LoRa_WriteReg(REG_IRQ_FLAGS, 0xFF);
 
-    g_lora_tx_done = 0;
     LoRa_SetMode(_LoRa, TRANSMIT_MODE);
 
-    if (!timeout) return LORA_OK;
+    if (timeout == 0) timeout = 2000;
 
     uint32_t t0 = LoRa_Platform_GetTickMs();
-    while (g_lora_tx_done == 0) {
+    while (1) {
+        uint8_t irq_flags = LoRa_ReadReg(REG_IRQ_FLAGS);
+
+        if ((irq_flags & 0x08) != 0) {
+            LoRa_WriteReg(REG_IRQ_FLAGS, 0x08);
+            break;
+        }
+
         if ((LoRa_Platform_GetTickMs() - t0) > timeout) {
             LoRa_SetMode(_LoRa, STNBY_MODE);
             g_lora_stats.tx_fail++;
@@ -275,7 +236,7 @@ LoRa_Status_t LoRa_Transmit(LoRa_Config_t* _LoRa, const uint8_t* buf,
 
 /**
  * @brief Transmits data using Listen Before Talk (LBT) mechanism via CAD.
- * * @param _LoRa       Pointer to the LoRa configuration structure.
+ * @param _LoRa       Pointer to the LoRa configuration structure.
  * @param buf         Pointer to the data buffer to be transmitted.
  * @param payload_len Length of the payload to transmit (Max 255 bytes).
  * @param timeout_ms  Maximum time allowed for the overall transmission process.
@@ -296,15 +257,15 @@ LoRa_Status_t LoRa_Transmit_LBT(LoRa_Config_t* _LoRa, const uint8_t* buf,
         uint8_t previous_mode = _LoRa->current_mode;
 
         LoRa_CAD_Status_t cad = LoRa_DoCAD(_LoRa, 100);
-        
+
         if (cad == LORA_CAD_TIMEOUT) {
             g_lora_stats.tx_fail++;
             return LORA_TIMEOUT;
         }
-        
+
         if (cad == LORA_CAD_BUSY) {
             g_lora_stats.tx_busy++;
-            continue; 
+            continue;
         }
 
         uint32_t remaining = deadline - LoRa_Platform_GetTickMs();
@@ -323,6 +284,7 @@ LoRa_Status_t LoRa_Transmit_LBT(LoRa_Config_t* _LoRa, const uint8_t* buf,
     g_lora_stats.tx_busy++;
     return LORA_BUSY;
 }
+
 /**
  * @brief Configures the center frequency of the RF carrier lock.
  * @param _LoRa Pointer to the LoRa configuration structure.
