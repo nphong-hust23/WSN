@@ -1,7 +1,5 @@
 
----
 
-```markdown
 # STM32 LoRa (SX1278) P2P Communication Library
 
 A lightweight, reliable, and non-blocking Peer-to-Peer (P2P) communication library for **SX127x/RFM95** LoRa modules using **STM32 HAL**. It features an interrupt-driven double-buffer architecture for the Gateway to prevent packet loss and a low-power polling mechanism for End Nodes.
@@ -32,7 +30,7 @@ The project consists of 4 core files:
 
 Before compiling, you must implement the following hardware-specific platform functions inside your board support package (typically mapped to STM32 HAL SPI & GPIO):
 
-```c
+
 void     LoRa_Platform_SPI_Init(void);
 uint8_t  LoRa_Platform_SPI_Transfer(uint8_t val);
 void     LoRa_Platform_NSS_Low(void);
@@ -42,7 +40,7 @@ void     LoRa_Platform_RESET_High(void);
 void     LoRa_Platform_DelayMs(uint32_t ms);
 uint32_t LoRa_Platform_GetTickMs(void);
 
-```
+
 
 ---
 
