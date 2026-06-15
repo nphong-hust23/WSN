@@ -2,7 +2,6 @@
 #include "LoRa.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 
 typedef struct {
     uint8_t node_id;
@@ -11,19 +10,20 @@ typedef struct {
     int16_t humidity_soil;
 } SensorPacket_t;
 
+typedef struct {
+    uint8_t broadcast_id;
+    uint8_t command_code;
+    uint16_t network_cycle_s;
+    uint16_t slot_duration_ms;
+} BeaconPacket_t;
+
 LoRa_Config_t gateway_config;
 
-static SensorPacket_t rx_data;
-static uint8_t rx_buffer[64];
-
-volatile uint8_t g_gateway_packet_ready = 0;
+static uint32_t last_beacon_tick = 0;
+volatile uint8_t g_dio0_flag = 0;
 
 extern void mPrint(const char* format, ...);
-extern volatile uint8_t g_lora_rx_done;
 
-/**
- * @brief Initializes the LoRa gateway configuration parameters and starts listening mode.
- */
 void Test_Gateway_Init(void) {
     gateway_config.frequency             = 433000000UL;
     gateway_config.preamble              = 10;
@@ -36,70 +36,83 @@ void Test_Gateway_Init(void) {
     gateway_config.enableCRC             = 1;
     gateway_config.implicitHeader        = 0;
 
-    if (LoRa_Init(&gateway_config) == LORA_OK) {
-        mPrint("LoRa Gateway Init Success (Safe Double-Buffer Interrupt)!\r\n");
-    } else {
-        mPrint("LoRa Gateway Init Failed!\r\n");
+    if (LoRa_Init(&gateway_config) != LORA_OK) {
+        mPrint("Gateway Init Failed!\r\n");
         return;
     }
 
-    LoRa_RxStart(&gateway_config);
-    mPrint("Gateway is scanning air for packets...\r\n");
+    mPrint("Gateway Init OK. Starting Master Clock...\r\n");
+
+    /* Force an immediate beacon transmission upon startup */
+    last_beacon_tick = HAL_GetTick() - 30000;
 }
 
-/**
- * @brief Main background process for the gateway, executed continuously inside the super loop.
- * Processes incoming sensor telemetry data when packets are ready in RAM.
- */
 void Test_Gateway_Run(void) {
-    if (g_gateway_packet_ready == 1) {
-        g_gateway_packet_ready = 0;
+    /* 1. Periodic Beacon Transmission */
+    if (HAL_GetTick() - last_beacon_tick >= 30000UL) {
+        last_beacon_tick = HAL_GetTick();
 
-        LoRa_ReadPacketData(&gateway_config, rx_buffer, sizeof(rx_buffer));
+        BeaconPacket_t beacon;
+        beacon.broadcast_id     = 0x00;
+        beacon.command_code     = 150;
+        beacon.network_cycle_s  = 30;
+        beacon.slot_duration_ms = 300;
 
-        memcpy(&rx_data, rx_buffer, sizeof(SensorPacket_t));
+        LoRa_Transmit(&gateway_config, (uint8_t*)&beacon, sizeof(BeaconPacket_t), 200);
+        mPrint("[MASTER] Broadcasted Sync Beacon. Listening...\r\n");
 
-        int16_t packet_rssi = LoRa_GetPacketRSSI();
-        int8_t  packet_snr  = LoRa_GetPacketSNR();
-
-        mPrint("RX OK | Node:%d Temp:%d Air:%d Soil:%d | RSSI:%d dBm | SNR:%d dB\r\n",
-                rx_data.node_id, rx_data.temperature, rx_data.humidity_air, rx_data.humidity_soil,
-                packet_rssi, packet_snr);
+        /* Flush FIFO pointer before entering RX mode to prevent buffer overflow */
+        LoRa_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
+        LoRa_RxStart(&gateway_config);
+        g_dio0_flag = 0;
     }
-}
 
-/**
- * @brief External Interrupt (EXTI) line callback implementation for the LoRa DIO0 pin.
- * Handles time-critical hardware IRQ flags, extracts FIFO data, and re-triggers RX mode.
- * @param GPIO_Pin Specifies the pins connected to the EXTI line.
- */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-    if (GPIO_Pin == LORA_DIO0_Pin) {
+    /* 2. Deferred Interrupt Handling for RX Processing */
+    if (g_dio0_flag == 1) {
+        g_dio0_flag = 0;
+
         uint8_t irq_flags = LoRa_ReadReg(REG_IRQ_FLAGS);
-
         LoRa_WriteReg(REG_IRQ_FLAGS, irq_flags);
 
         if (irq_flags & 0x20) {
-            g_lora_stats.rx_crc_err++;
-            LoRa_RxStart(&gateway_config);
-            return;
+            mPrint("[DROP] CRC Error\r\n");
         }
-
-        if (irq_flags & 0x40) {
+        else if (irq_flags & 0x40) {
+            /* Switch to Standby mode to lock the FIFO during read operations */
             LoRa_WriteReg(REG_OP_MODE, 0x80 | 0x08 | 0x01);
 
-            uint8_t pkt_len   = LoRa_ReadReg(REG_RX_NB_BYTES);
+            uint8_t pkt_len = LoRa_ReadReg(REG_RX_NB_BYTES);
             uint8_t fifo_addr = LoRa_ReadReg(REG_FIFO_RX_CURRENT);
 
-            if (pkt_len == sizeof(SensorPacket_t)) {
+            /* Peek the first byte to filter out self-broadcasted beacon echoes */
+            LoRa_WriteReg(REG_FIFO_ADDR_PTR, fifo_addr);
+            uint8_t first_byte = LoRa_ReadReg(REG_FIFO);
+
+            if (first_byte != 0x00 && pkt_len == sizeof(SensorPacket_t)) {
+                SensorPacket_t rx_data;
+
+                /* Reset FIFO pointer to the start of the payload before burst read */
                 LoRa_WriteReg(REG_FIFO_ADDR_PTR, fifo_addr);
-                LoRa_BurstRead(REG_FIFO, rx_buffer, pkt_len);
+                LoRa_BurstRead(REG_FIFO, (uint8_t*)&rx_data, pkt_len);
 
-                g_lora_rx_done = 1;
-                g_gateway_packet_ready = 1;
+                int16_t rssi = LoRa_GetPacketRSSI();
+                mPrint("RX OK | Node:%d | T:%d.%d C | A:%d.%d%% | S:%d.%d%% | RSSI:%d\r\n",
+                    rx_data.node_id,
+                    rx_data.temperature / 100, rx_data.temperature % 100,
+                    rx_data.humidity_air / 100, rx_data.humidity_air % 100,
+                    rx_data.humidity_soil / 100, rx_data.humidity_soil % 100,
+                    rssi);
             }
-
-            LoRa_RxStart(&gateway_config);
         }
+
+        /* Mandatory FIFO cleanup to prevent the 256-byte saturation lockup */
+        LoRa_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
+        LoRa_RxStart(&gateway_config);
+    }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == LORA_DIO0_Pin) {
+        g_dio0_flag = 1;
     }
 }

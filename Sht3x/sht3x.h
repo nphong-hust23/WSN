@@ -7,9 +7,14 @@
 #define SHT3X_CMD_MEAS_CS_MED     0x2C0D  // Clock stretching enabled, medium repeatability
 #define SHT3X_CMD_MEAS_CS_LOW     0x2C10  // Clock stretching enabled, low repeatability
 
-#define SHT3X_CMD_MEAS_POLL_HIGH  0x2400  // Clock stretching disabled, high repeatability
-#define SHT3X_CMD_MEAS_POLL_MED   0x240B  // Clock stretching disabled, medium repeatability
-#define SHT3X_CMD_MEAS_POLL_LOW   0x2416  // Clock stretching disabled, low repeatability
+#define SHT3X_CMD_MEAS_HIGH  0x2400  // Clock stretching disabled, high repeatability
+#define SHT3X_CMD_MEAS_MED   0x240B  // Clock stretching disabled, medium repeatability
+#define SHT3X_CMD_MEAS_LOW   0x2416  // Clock stretching disabled, low repeatability
+
+/*Max Measurement Duration in ms (Valid for VDD 2.4V to 5.5V)uint*/
+#define SHT3X_MEAS_DELAY_LOW_MS     4
+#define SHT3X_MEAS_DELAY_MEDIUM_MS  6
+#define SHT3X_MEAS_DELAY_HIGH_MS    15
 
 /* Periodic Data Acquisition Mode Commands */
 #define SHT3X_CMD_PERI_0_5_HIGH   0x2032  // 0.5 measurements per second (mps), high repeatability
@@ -56,9 +61,18 @@
 typedef enum{
     SHT3x_OK     = 0,
     SHT3x_ERROR    = -1, 
-}SHT3x_status;
+}SHT3x_status_t;
 
+typedef enum {
+    SHT3X_REPEAT_LOW    = 0,
+    SHT3X_REPEAT_MEDIUM = 1,
+    SHT3X_REPEAT_HIGH   = 2
+} SHT3x_Repeatability_t;
 
+typedef enum{
+    SHT3X_CS_ENABLED    = 0,
+    SHT3X_CS_DISABLED   = 1
+}SHT3x_Clock_stretching_t
 
 SHT3x_status SHT3x_write_byte();
 SHT3x_status SHT3x_read_byte();
