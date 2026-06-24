@@ -165,7 +165,7 @@ void Test_Node_Run(void) {
 
         /* State 2: Enter deep sleep for the remainder of the network cycle */
         case STATE_SLEEP_UNTIL_NEXT: {
-            uint32_t target_wakeup_ms = (cfg_cycle_s * 1000) - 1000;
+            uint32_t target_wakeup_ms = (cfg_cycle_s * 1000) - 2000;
 
             mPrint("[SLEEP] Sleeping until %d ms to catch next Beacon...\r\n", target_wakeup_ms);
 
