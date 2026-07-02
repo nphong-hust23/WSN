@@ -39,6 +39,9 @@ void     LoRa_Platform_RESET_Low(void);
 void     LoRa_Platform_RESET_High(void);
 void     LoRa_Platform_DelayMs(uint32_t ms);
 uint32_t LoRa_Platform_GetTickMs(void);
+int8_t SHT3x_Platform_I2C_Transmit(uint8_t address, uint8_t* p_data, uint16_t size, uint32_t timeout);
+int8_t SHT3x_Platform_I2C_Receive(uint8_t address, uint8_t* buffer, uint16_t size, uint32_t timeout);
+void   SHT3x_Platform_Delay_ms(uint32_t ms);
 
 ```
 
