@@ -12,8 +12,8 @@ The project consists of 4 core files:
 | :--- | :--- | :--- |
 | **`LoRa.h`** | Header | Pin definitions, register maps, configuration structures, and core function prototypes. |
 | **`LoRa.c`** | Source | Low-level SPI abstraction, hardware register manipulation, and driver implementations. |
-| **`Test_Gateway.c`** | Application | Gateway-side application using **EXTI Interrupts** for continuous background listening. |
-| **`Test_Node.c`** | Application | Node-side application using **Polling Mode** and automatic Power-Saving Sleep cycles. |
+| **`LoRa_Gateway.c`** | Application | Gateway-side application using **EXTI Interrupts** for continuous background listening. |
+| **`LoRa_Node.c`** | Application | Node-side application using **Polling Mode** and automatic Power-Saving Sleep cycles. |
 
 ---
 
